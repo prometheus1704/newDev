@@ -1,0 +1,37 @@
+prac1
+---------------
+
+
+import pandas as pd
+
+# Titanic dataset hosted on GitHub (same structure as Kaggle's train.csv)
+url = "https://raw.githubusercontent.com/datasciencedojo/datasets/master/titanic.csv"
+df = pd.read_csv(url)
+
+df.head()
+
+df.isnull().sum()
+
+df.describe(include='all')
+
+df.info()
+df.shape
+
+df.dtypes
+
+df['Pclass'] = df['Pclass'].astype('category')
+
+df['Survived'] = df['Survived'].astype('bool')
+
+from sklearn.preprocessing import MinMaxScaler
+
+scaler = MinMaxScaler()
+
+# Normalize only numeric features (excluding target & categorical)
+numeric_cols = ['Age', 'Fare']
+df[numeric_cols] = scaler.fit_transform(df[numeric_cols])
+
+print(df[numeric_cols].head())
+
+df_encoded = pd.get_dummies(df, columns=['Sex', 'Embarked'], drop_first=True)
+df_encoded.head()

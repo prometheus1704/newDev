@@ -1,0 +1,58 @@
+
+
+%pip install pandas seaborn matplotlib
+
+import pandas as pd
+import numpy as np 
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+
+
+
+df = pd.read_csv("Employee.csv")
+df.head(5)
+
+
+
+df.notnull().sum()
+
+
+dtype: int64
+
+df.describe()
+
+
+
+mean_val=df.mean(numeric_only=True)
+print(mean_val)
+
+print("\nMedian:\n", df.median(numeric_only=True))
+
+
+
+mode_val = df.mode()
+mode_val
+
+
+# import matplotlib.pyplot as plt
+
+sns.histplot(
+data=df,
+x='Age',
+bins=6,  # You can adjust the number of bins
+kde=True,  # Add a kernel density estimate line
+color='cornflowerblue',
+alpha=0.7,
+edgecolor='black',
+linewidth=1
+)
+plt.show()  
+
+
+
+plt.figure(figsize = (8,5))
+sns.boxplot(x=df['PaymentTier'], y=df['Age'])
+plt.show()
+
+

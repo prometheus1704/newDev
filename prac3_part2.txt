@@ -1,0 +1,61 @@
+
+
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns 
+
+df = pd.read_csv('Iris.csv')
+df.head(5)
+
+df.info()
+
+
+df.nunique()
+
+
+
+removed_df = df[df['Species'] != 'Iris-virginica']
+removed_df = removed_df.drop(columns=['Id'])
+removed_df
+
+
+
+setosa = removed_df[removed_df['Species']== 'Iris-setosa']
+print(setosa.count())
+
+versicolor = removed_df[removed_df['Species']== 'Iris-versicolor']
+print(versicolor.count())
+
+
+
+print(setosa.describe())
+print("\nSetosa Description:")
+print(setosa.describe())
+
+
+
+setosa_data = setosa.drop('Species',axis=1)
+setosa_corr = setosa_data.corr()
+print("\nSetosa Correlation Matrix:")
+setosa_corr
+
+
+
+
+sns.heatmap(setosa_corr,cmap='coolwarm', annot=True)
+plt.title('Iris-setosa Correlation Matrix')
+plt.show()
+
+
+
+final_data = removed_df[removed_df['Species']!= 'Iris-virginica']
+final_mat = final_data.drop('Species',axis = 1)
+final_mat.corr()
+
+
+
+sns.heatmap(final_mat.corr(),cmap="coolwarm", annot=True)
+plt.title('Iris-setosa and Iris-versicolor Correlation Matrix')
+
+
+

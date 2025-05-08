@@ -1,0 +1,75 @@
+
+import pandas as pd
+import numpy as np 
+import matplotlib.pyplot as plt
+import seaborn as sns 
+
+data1 = {
+'StudentID': [101, 102, 103, 104, 105, 106, 107, 108, 109, 110],
+'Name': ['Alice', 'Bob', 'Charlie', 'David', 'Eva', 'Frank', 'Grace', 'Helen', 'Ian', 'Julia'],
+'Age': [20, 22, 21, None, 20, 23, 19, 22, 21, 20],  # Missing age for David
+'Gender': ['F', 'M', 'M', 'M', 'F', 'M', 'F', 'F', 'M', 'F'],
+'Department': ['CS', 'EC', 'EE', 'CS', 'EC', 'EE', 'CS', 'EC', 'EE', 'CS'],
+'Marks': ['85%', '90%', '70%', 'N/A', '95%', 'invalid', '78%', '88%', '72%', '80%'],  # Inconsistent & missing marks
+'Height_cm': [165, 170, 180, 155, 175, 182, 168, 160, 178, 172],
+'Weight_kg': [58, 70, 80, 55, 65, 85, 58, 56, 75, 62],
+'Email': ['alice@example.com', '', 'charlie@univ.edu', 'david@yahoo.com', 'eva@gmail.com',
+'frank@uni.ac.in', 'grace@email.com', 'helen@abc.org', 'ian@edu.net', 'julia@school.edu']
+}
+
+df1 = pd.DataFrame(data1)
+df1
+
+val = df1['Email']!=''
+processed_df = df1[val].copy()
+processed_df
+
+processed_df['Age'] = processed_df['Age'].fillna(processed_df['Age'].median())
+processed_df
+
+processed_df['Marks'] = processed_df['Marks'].replace({'N/A': None, 'invalid':None})
+processed_df['Marks']= processed_df['Marks'].str.replace('%','').astype(float)
+processed_df['Marks'] = processed_df['Marks'].fillna(processed_df['Marks'].mean())
+
+processed_df
+
+# Data Wrangling
+df2 = processed_df.copy()
+df2['Gender']= df2['Gender'].replace({'F':'Female','M':'Male'})
+df2
+
+# Handllig Outliers and unrealistic values
+df3 = df2[(df2['Height_cm']>150) & (df2['Weight_kg']<100)]
+df3
+
+# Another dataset from a different department
+new = {
+'StudentID': [101, 102, 103, 104, 105],
+'Attendance': [90, 85, 95, 70, 92]
+}
+df_attendance = pd.DataFrame(new)
+
+# Merge both datasets
+df_integrated = pd.merge(df3, df_attendance, on='StudentID', how='left')
+df_integrated
+
+# Data Aggregation
+aggregate = df_integrated.groupby('Department')['Marks'].agg(['mean','max','min'])
+aggregate
+
+from sklearn.preprocessing import MinMaxScaler,StandardScaler
+
+scaler = MinMaxScaler()
+df_integrated[['Marks_MinMax', 'Height_MinMax', 'Weight_MinMax']] = scaler.fit_transform(df_integrated[['Marks', 'Height_cm', 'Weight_kg']])
+
+# Z-Score Normalization
+stdscaler = StandardScaler()
+df_integrated[['Marks_Standard', 'Height_Standard', 'Weight_Standard']] = stdscaler.fit_transform(df_integrated[['Marks', 'Height_cm', 'Weight_kg']])
+df_integrated
+
+last = df_integrated.copy()
+last['Graduation'] = last.apply(lambda row: 'Pass' if (row['Marks'] >= 50 and pd.notnull(row['Attendance'])) else 'Fail', axis=1)
+last
+
+last['BMI'] = last['Weight_kg'] / ((last['Height_cm']/100)**2)
+last
