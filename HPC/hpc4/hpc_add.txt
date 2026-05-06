@@ -1,0 +1,246 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+#include <time.h>
+#include <cuda_runtime.h>
+
+static void cudaCheck(cudaError_t err, const char *what)
+{
+    if (err != cudaSuccess)
+    {
+        fprintf(stderr, "CUDA error in %s: %s\n",
+                what,
+                cudaGetErrorString(err));
+        exit(1);
+    }
+}
+
+// CUDA kernel
+__global__ void vecAdd(double *a, double *b, double *c, int n)
+{
+    int id = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if (id < n)
+    {
+        c[id] = a[id] + b[id];
+    }
+}
+
+int main(int argc, char *argv[])
+{
+    // Size of vectors
+    int n = 1 << 20;
+
+    if (argc >= 2)
+    {
+        long long parsed = atoll(argv[1]);
+
+        if (parsed <= 0 || parsed > 200000000LL)
+        {
+            fprintf(stderr,
+                    "Usage: %s [N]\nN must be in (0, 200000000]\n",
+                    argv[0]);
+            return 1;
+        }
+
+        n = (int)parsed;
+    }
+
+    // Host vectors
+    double *h_a;
+    double *h_b;
+    double *h_c;
+    double *h_cpu;
+
+    // Device vectors
+    double *d_a;
+    double *d_b;
+    double *d_c;
+
+    size_t bytes = n * sizeof(double);
+
+    // Allocate host memory
+    h_a = (double *)malloc(bytes);
+    h_b = (double *)malloc(bytes);
+    h_c = (double *)malloc(bytes);
+    h_cpu = (double *)malloc(bytes);
+
+    if (!h_a || !h_b || !h_c || !h_cpu)
+    {
+        fprintf(stderr,
+                "Host malloc failed for %zu bytes\n",
+                bytes);
+        return 1;
+    }
+
+    // Initialize vectors
+    int i;
+
+    for (i = 0; i < n; i++)
+    {
+        h_a[i] = (double)i * 0.5;
+        h_b[i] = (double)i * 1.5;
+    }
+
+    // ---------------- CPU Sequential Addition ----------------
+
+    clock_t cpu_start, cpu_end;
+
+    cpu_start = clock();
+
+    for (i = 0; i < n; i++)
+    {
+        h_cpu[i] = h_a[i] + h_b[i];
+    }
+
+    cpu_end = clock();
+
+    double cpu_time_ms =
+        ((double)(cpu_end - cpu_start) * 1000.0) / CLOCKS_PER_SEC;
+
+    // ---------------- GPU Memory Allocation ----------------
+
+    cudaCheck(cudaMalloc((void **)&d_a, bytes),
+              "cudaMalloc(d_a)");
+
+    cudaCheck(cudaMalloc((void **)&d_b, bytes),
+              "cudaMalloc(d_b)");
+
+    cudaCheck(cudaMalloc((void **)&d_c, bytes),
+              "cudaMalloc(d_c)");
+
+    // Copy data to GPU
+    cudaCheck(cudaMemcpy(d_a,
+                         h_a,
+                         bytes,
+                         cudaMemcpyHostToDevice),
+              "cudaMemcpy(d_a)");
+
+    cudaCheck(cudaMemcpy(d_b,
+                         h_b,
+                         bytes,
+                         cudaMemcpyHostToDevice),
+              "cudaMemcpy(d_b)");
+
+    // Thread configuration
+    int blockSize = 256;
+    int gridSize = (n + blockSize - 1) / blockSize;
+
+    // CUDA timing events
+    cudaEvent_t start, stop;
+
+    cudaCheck(cudaEventCreate(&start),
+              "cudaEventCreate(start)");
+
+    cudaCheck(cudaEventCreate(&stop),
+              "cudaEventCreate(stop)");
+
+    // ---------------- GPU Vector Addition ----------------
+
+    cudaCheck(cudaEventRecord(start),
+              "cudaEventRecord(start)");
+
+    vecAdd<<<gridSize, blockSize>>>(d_a, d_b, d_c, n);
+
+    cudaCheck(cudaGetLastError(),
+              "Kernel launch");
+
+    cudaCheck(cudaEventRecord(stop),
+              "cudaEventRecord(stop)");
+
+    cudaCheck(cudaEventSynchronize(stop),
+              "cudaEventSynchronize(stop)");
+
+    // Copy result back to CPU
+    cudaCheck(cudaMemcpy(h_c,
+                         d_c,
+                         bytes,
+                         cudaMemcpyDeviceToHost),
+              "cudaMemcpy(h_c)");
+
+    // GPU time
+    float gpu_time_ms = 0.0f;
+
+    cudaCheck(cudaEventElapsedTime(&gpu_time_ms,
+                                   start,
+                                   stop),
+              "cudaEventElapsedTime");
+
+    // ---------------- Output ----------------
+
+    printf("N = %d\n", n);
+
+    printf("\nGPU Parallel Time = %.3f ms\n",
+           gpu_time_ms);
+
+    printf("CPU Sequential Time = %.3f ms\n",
+           cpu_time_ms);
+
+    if (gpu_time_ms > 0.0f)
+    {
+        printf("Speedup = %.3fx\n",
+               cpu_time_ms / gpu_time_ms);
+    }
+
+    int show = 5;
+
+    if (n < show)
+    {
+        show = n;
+    }
+
+    printf("\nFirst %d elements of Array A:\n",
+           show);
+
+    for (i = 0; i < show; i++)
+    {
+        printf("%.3f ", h_a[i]);
+    }
+
+    printf("\n");
+
+    printf("\nFirst %d elements of Array B:\n",
+           show);
+
+    for (i = 0; i < show; i++)
+    {
+        printf("%.3f ", h_b[i]);
+    }
+
+    printf("\n");
+
+    printf("\nFirst %d elements of GPU Result Array:\n",
+           show);
+
+    for (i = 0; i < show; i++)
+    {
+        printf("%.3f ", h_c[i]);
+    }
+
+    printf("\n");
+
+    printf("\nFirst %d elements of CPU Result Array:\n",
+           show);
+
+    for (i = 0; i < show; i++)
+    {
+        printf("%.3f ", h_cpu[i]);
+    }
+
+    printf("\n");
+
+    // Cleanup
+    cudaEventDestroy(start);
+    cudaEventDestroy(stop);
+
+    cudaFree(d_a);
+    cudaFree(d_b);
+    cudaFree(d_c);
+
+    free(h_a);
+    free(h_b);
+    free(h_c);
+    free(h_cpu);
+
+    return 0;
+}
